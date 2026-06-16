@@ -180,7 +180,7 @@ function parseDate(text){
   if(/明後日|あさって/.test(t)){const d=new Date(today);d.setDate(d.getDate()+2);return d;}
   if(/明日|あした|あす/.test(t)){const d=new Date(today);d.setDate(d.getDate()+1);return d;}
   let m=t.match(/(\d{1,2})\s*月\s*(\d{1,2})\s*日?/);
-  if(m){let d=new Date(today.getFullYear(),+m[1]-1,+m[2]); if(d<today && (+m[1]-1)<today.getMonth()) d.setFullYear(d.getFullYear()+1); return d;}
+  if(m) return new Date(today.getFullYear(),+m[1]-1,+m[2]); // ダイヤは当年(2026)固定。翌年送りしない
   m=t.match(/(\d{1,2})\s*日/);
   if(m){let d=new Date(today.getFullYear(),today.getMonth(),+m[1]); if(d<today) d=new Date(today.getFullYear(),today.getMonth()+1,+m[1]); return d;}
   const wd=["日曜","月曜","火曜","水曜","木曜","金曜","土曜"];
@@ -230,7 +230,8 @@ function answerSchedule(text){
   html+=`<table>`;
   for(const s of list){
     const dest=s.d==="粟"?"岩船":"粟島";
-    html+=`<tr><td class="dir">${s.d}島発${s.d==="岩"?"※":""}</td><td>${s.t} → ${dest}着 ${s.a}${s.hs?' <span class="hs">🚤高速船</span>':''}</td></tr>`;
+    const depLabel=s.d==="粟"?"粟島発":"岩船発";
+    html+=`<tr><td class="dir">${depLabel}</td><td>${s.t} → ${dest}着 ${s.a}${s.hs?' <span class="hs">🚤高速船</span>':''}</td></tr>`;
   }
   html+=`</table>`;
   html+=`<span class="note">「粟島発」＝島→岩船 ／ 「岩船発」＝岩船→島`+
