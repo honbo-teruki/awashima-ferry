@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#0b7ec2">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>粟島汽船 ダイヤ案内ボット</title>
 <style>
   :root{
@@ -78,7 +81,7 @@
     <input id="q" placeholder="例：6月20日 / 土曜の粟島発 / 明日 帰りの船">
     <button class="send" type="submit" aria-label="送信">➤</button>
   </form>
-  <div class="foot">最新・確実な情報は公式サイトと当日の運航状況でご確認ください</div>
+  <div class="foot">データ版: 令和8年3〜9月ダイヤ ／ v3（6/16更新）｜最新・確実な情報は公式サイトでご確認ください</div>
 </div>
 
 <script>
@@ -152,7 +155,7 @@ const PERIODS = [
   {from:"2026-07-20", to:"2026-08-15", dow:T_SUM, label:"夏ダイヤ"},
   {from:"2026-08-16", to:"2026-08-16", dow:one("OUT5"), label:"夏ダイヤ"},
   {from:"2026-08-17", to:"2026-09-18", dow:T_FALL},
-  {from:"2026-09-19", to:"2026-09-22", dow:T_FALL},
+  {from:"2026-09-19", to:"2026-09-22", dow:["OUT4","STD4","STD2","STD2","STD2","EVE3","OUT4"], label:"連休ダイヤ"},
   {from:"2026-09-23", to:"2026-09-23", dow:one("EVE3")},
   {from:"2026-09-24", to:"2026-09-30", dow:T_FALL},
 ];
