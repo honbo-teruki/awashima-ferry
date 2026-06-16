@@ -41,6 +41,7 @@
   .bubble table{border-collapse:collapse; margin:4px 0; width:100%; font-size:13px;}
   .bubble td{padding:2px 6px 2px 0; vertical-align:top;}
   .bubble .dir{color:var(--blue-d); font-weight:600; white-space:nowrap;}
+  .bubble .hs{color:#c2410c; font-weight:700;}
   .bubble .note{font-size:11px; color:var(--muted); margin-top:6px; display:block;}
   .bubble a{color:var(--blue-d);}
   .quick{display:flex; flex-wrap:wrap; gap:6px; padding:6px 12px 2px;}
@@ -82,209 +83,195 @@
 
 <script>
 /* =========================================================================
-   ★★★ ダイヤ更新はこのブロックだけ直せばOK（毎月の差し替え用）★★★
-   出典: 粟島汽船 公式 https://awashimakisen.co.jp/schedule.html
-   このデータ: 2026年6月 時刻表PDF（普通船フェリー「ニューあわしま」/ 片道約95分）
+   ★★★ ダイヤ更新はこのブロックだけ直せばOK ★★★
+   出典: 粟島汽船 公式「令和8年3月～9月 粟島汽船運航時刻表」
+        https://awashimakisen.co.jp/schedule.html
+   船: フェリー「ニューあわしま」(片道約95分)。3/23-4/7のみ高速船(約60分)。
+   便の向き: d="粟"=粟島発→岩船着 / d="岩"=岩船発→粟島着
+   t=出発時刻, a=到着時刻, hs:true=高速船
    ========================================================================= */
-const DATA = {
-  official: "https://awashimakisen.co.jp/schedule.html",
-  tel: "0254-55-2131",
-  ship: "普通船フェリー「ニューあわしま」",
-  crossingMin: 95,
-  // データが有効な期間（この外の日付は「要確認」と案内）
-  validFrom: "2026-03-01",
-  validTo:   "2026-09-30",
+const INFO = {
+  official:"https://awashimakisen.co.jp/schedule.html",
+  tel:"0254-55-2131",
+  validFrom:"2026-03-01", validTo:"2026-09-30",
+  source:"令和8年3月～9月ダイヤ",
+};
 
-  // 曜日ごとの基本ダイヤ（0=日, 1=月, ... 6=土）
-  // dep: 出発地, time: 出発, arr: 到着
-  weekday: {
-    // 月・金・土・日 = 1日4便
-    full: [
-      {dep:"粟島", time:"8:00",  arr:"9:35"},
-      {dep:"岩船", time:"10:15", arr:"11:50"},
-      {dep:"粟島", time:"12:45", arr:"14:20"},
-      {dep:"岩船", time:"15:00", arr:"16:35"},
-    ],
-    // 火・水・木 = 1日2便
-    short: [
-      {dep:"粟島", time:"8:00",  arr:"9:35"},
-      {dep:"岩船", time:"15:00", arr:"16:35"},
-    ],
-  },
-  // 各曜日がどちらのパターンか
-  patternByDow: {0:"full", 1:"full", 2:"short", 3:"short", 4:"short", 5:"full", 6:"full"},
+// --- 便パターン（再利用する型） ---
+const S = (d,t,a,hs)=>({d,t,a,hs:!!hs});
+const PAT = {
+  // 通常4便（粟8:00 岩10:15 粟12:45 岩15:00）
+  STD4:[S("粟","8:00","9:35"),  S("岩","10:15","11:50"), S("粟","12:45","14:20"), S("岩","15:00","16:35")],
+  // 通常2便（粟8:00 岩15:00）
+  STD2:[S("粟","8:00","9:35"),  S("岩","15:00","16:35")],
+  // 島出4便（岩8:00 粟10:30 岩12:45 粟15:00）
+  OUT4:[S("岩","8:00","9:35"),  S("粟","10:30","12:05"), S("岩","12:45","14:20"), S("粟","15:00","16:35")],
+  // 夏5便（島出4便＋岩17:10）
+  OUT5:[S("岩","8:00","9:35"),  S("粟","10:30","12:05"), S("岩","12:45","14:20"), S("粟","15:00","16:35"), S("岩","17:10","18:45")],
+  // 午後増（粟8:00 岩14:00 岩16:10）
+  EVE3:[S("粟","8:00","9:35"),  S("岩","14:00","15:35"), S("岩","16:10","17:45")],
+  // 日曜型（岩8:00 粟14:00 岩16:10）
+  SUN3:[S("岩","8:00","9:35"),  S("粟","14:00","15:35"), S("岩","16:10","17:45")],
+  // 高速船（約60分）3/23-4/7 フェリードック期間
+  HS2: [S("粟","8:00","9:00",true), S("岩","15:00","16:00",true)],
+  // 4/19 島内マラソン
+  MARA:[S("粟","8:00","9:35"),  S("岩","10:15","11:50"), S("粟","13:30","15:05"), S("岩","15:30","17:05")],
+  // 6/20(土)
+  C620:[S("粟","8:00","9:35"),  S("岩","10:15","11:50"), S("粟","12:15","13:50"), S("岩","14:15","15:50"), S("岩","16:15","17:50")],
+  // 6/21(日) クリーンアップ
+  C621:[S("岩","8:00","9:35"),  S("粟","10:30","12:05"), S("岩","12:45","14:20"), S("粟","15:00","16:35"), S("岩","17:00","18:35")],
+};
 
-  // 特別日（曜日パターンより優先）。キーは YYYY-MM-DD
-  exceptions: {
-    "2026-06-20": {
-      label:"増便日",
-      sailings:[
-        {dep:"粟島", time:"8:00",  arr:"9:35"},
-        {dep:"岩船", time:"10:15", arr:"11:50"},
-        {dep:"粟島", time:"12:15", arr:"13:50"},
-        {dep:"岩船", time:"14:15", arr:"15:50"},
-        {dep:"粟島", time:"16:15", arr:"17:50"},
-      ]
-    },
-    "2026-06-21": {
-      label:"クリーンアップ（特別ダイヤ）",
-      sailings:[
-        {dep:"岩船", time:"8:00",  arr:"9:35"},
-        {dep:"粟島", time:"10:30", arr:"12:05"},
-        {dep:"岩船", time:"12:45", arr:"14:20"},
-        {dep:"粟島", time:"15:00", arr:"16:35"},
-        {dep:"岩船", time:"17:00", arr:"18:35"},
-      ]
-    },
-  },
+// 曜日テンプレ：配列の並びは [日,月,火,水,木,金,土]
+const T_A    = ["STD2","STD4","STD2","STD2","STD2","STD4","STD2"]; // 春前期：月金=4便, 他=2便
+const T_B    = ["STD4","STD4","STD2","STD2","STD2","STD4","STD4"]; // 標準：月金土日=4便, 火水木=2便
+const T_SUM  = ["OUT5","OUT5","STD4","STD4","OUT5","OUT5","OUT5"]; // 夏：火水=通常4, 他=夏5便
+const T_FALL = ["SUN3","STD4","STD2","STD2","STD2","EVE3","OUT4"]; // 晩夏〜秋：月=4,火水木=2,金=午後増,土=島出4,日=日曜型
+const one = p => [p,p,p,p,p,p,p];
 
-  // 運賃（片道・普通船）出典: 料金表 R7.10.1適用
-  fare: {
-    note:"片道・普通船。※2026年7月1日に運賃改定予定（最新は公式で確認）",
-    rows:[
-      ["大人（中学生以上）","2,520円"],
-      ["小学生","1,260円"],
-      ["大人 往復","—（公式参照）"],
-    ]
-  }
+// 期間定義（連続・重複なし。新しいダイヤが出たらここを差し替え）
+const PERIODS = [
+  {from:"2026-03-01", to:"2026-03-22", dow:T_A},
+  {from:"2026-03-23", to:"2026-04-07", dow:one("HS2"), label:"フェリードック・高速船運航"},
+  {from:"2026-04-08", to:"2026-04-17", dow:T_A},
+  {from:"2026-04-18", to:"2026-04-18", dow:one("STD4")},
+  {from:"2026-04-19", to:"2026-04-19", dow:one("MARA"), label:"島内マラソン"},
+  {from:"2026-04-20", to:"2026-04-27", dow:T_B},
+  {from:"2026-04-28", to:"2026-04-28", dow:one("EVE3")},
+  {from:"2026-04-29", to:"2026-05-05", dow:one("OUT4"), label:"GW特別ダイヤ"},
+  {from:"2026-05-06", to:"2026-05-06", dow:one("SUN3")},
+  {from:"2026-05-07", to:"2026-05-13", dow:T_B},
+  {from:"2026-05-14", to:"2026-05-14", dow:one("STD4")},
+  {from:"2026-05-15", to:"2026-05-15", dow:one("EVE3"), label:"島内健診"},
+  {from:"2026-05-16", to:"2026-06-19", dow:T_B},
+  {from:"2026-06-20", to:"2026-06-20", dow:one("C620"), label:"増便日"},
+  {from:"2026-06-21", to:"2026-06-21", dow:one("C621"), label:"クリーンアップ"},
+  {from:"2026-06-22", to:"2026-07-16", dow:T_B},
+  {from:"2026-07-17", to:"2026-07-17", dow:one("EVE3")},
+  {from:"2026-07-18", to:"2026-07-19", dow:one("OUT4")},
+  {from:"2026-07-20", to:"2026-08-15", dow:T_SUM, label:"夏ダイヤ"},
+  {from:"2026-08-16", to:"2026-08-16", dow:one("OUT5"), label:"夏ダイヤ"},
+  {from:"2026-08-17", to:"2026-09-18", dow:T_FALL},
+  {from:"2026-09-19", to:"2026-09-22", dow:T_FALL},
+  {from:"2026-09-23", to:"2026-09-23", dow:one("EVE3")},
+  {from:"2026-09-24", to:"2026-09-30", dow:T_FALL},
+];
+
+// 運賃（片道・フェリー）出典: 料金表 R7.10.1適用
+const FARE = {
+  note:"片道・フェリー。※2026年7月1日に運賃改定予定（最新は公式で確認）",
+  rows:[ ["大人（中学生以上）","2,520円"], ["小学生","1,260円"] ]
 };
 /* ===================== 更新ブロックここまで ===================== */
 
 
 /* ---------- ユーティリティ ---------- */
-const DOW = ["日","月","火","水","木","金","土"];
-const ZEN2HAN = s => s.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0)-0xFEE0));
-const pad = n => String(n).padStart(2,"0");
-const iso = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-const fmtDate = d => `${d.getMonth()+1}月${d.getDate()}日(${DOW[d.getDay()]})`;
-
-function inRange(d){
-  const f=new Date(DATA.validFrom), t=new Date(DATA.validTo);
-  return d>=f && d<=t;
-}
+const DOW=["日","月","火","水","木","金","土"];
+const ZEN2HAN=s=>s.replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0));
+const pad=n=>String(n).padStart(2,"0");
+const iso=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const fmtDate=d=>`${d.getMonth()+1}月${d.getDate()}日(${DOW[d.getDay()]})`;
 
 /* ---------- 日付の解釈 ---------- */
 function parseDate(text){
-  const t = ZEN2HAN(text);
-  const today = new Date(); today.setHours(0,0,0,0);
-
+  const t=ZEN2HAN(text);
+  const today=new Date(); today.setHours(0,0,0,0);
   if(/今日|本日/.test(t)) return today;
-  if(/明後日|あさって/.test(t)){ const d=new Date(today); d.setDate(d.getDate()+2); return d; }
-  if(/明日|あした|あす/.test(t)){ const d=new Date(today); d.setDate(d.getDate()+1); return d; }
-
-  // X月Y日
-  let m = t.match(/(\d{1,2})\s*月\s*(\d{1,2})\s*日?/);
-  if(m){ const d=new Date(today.getFullYear(), +m[1]-1, +m[2]); if(d<today && today.getMonth()>+m[1]-1) d.setFullYear(d.getFullYear()+1); return d; }
-
-  // Y日（今月。過ぎていたら来月）
-  m = t.match(/(\d{1,2})\s*日/);
-  if(m){
-    let d=new Date(today.getFullYear(), today.getMonth(), +m[1]);
-    if(d<today) d=new Date(today.getFullYear(), today.getMonth()+1, +m[1]);
-    return d;
-  }
-
-  // 曜日（今週の/次の）→ 次に来るその曜日
-  const wd = ["日曜","月曜","火曜","水曜","木曜","金曜","土曜"];
-  for(let i=0;i<7;i++){
-    if(t.includes(wd[i])){
-      const d=new Date(today);
-      let diff=(i - d.getDay()+7)%7;
-      if(diff===0) diff=0; // 今日がその曜日なら今日
-      d.setDate(d.getDate()+diff);
-      return d;
-    }
-  }
+  if(/明後日|あさって/.test(t)){const d=new Date(today);d.setDate(d.getDate()+2);return d;}
+  if(/明日|あした|あす/.test(t)){const d=new Date(today);d.setDate(d.getDate()+1);return d;}
+  let m=t.match(/(\d{1,2})\s*月\s*(\d{1,2})\s*日?/);
+  if(m){let d=new Date(today.getFullYear(),+m[1]-1,+m[2]); if(d<today && (+m[1]-1)<today.getMonth()) d.setFullYear(d.getFullYear()+1); return d;}
+  m=t.match(/(\d{1,2})\s*日/);
+  if(m){let d=new Date(today.getFullYear(),today.getMonth(),+m[1]); if(d<today) d=new Date(today.getFullYear(),today.getMonth()+1,+m[1]); return d;}
+  const wd=["日曜","月曜","火曜","水曜","木曜","金曜","土曜"];
+  for(let i=0;i<7;i++){ if(t.includes(wd[i])){const d=new Date(today); d.setDate(d.getDate()+((i-d.getDay()+7)%7)); return d;} }
   return null;
 }
 
 /* ---------- 方向の解釈 ---------- */
 function parseDir(text){
-  if(/粟島発|島発|島から|帰り|戻り|帰る/.test(text)) return "粟島";
-  if(/岩船発|岩船から|行き|渡る|島へ|粟島へ|村上/.test(text)) return "岩船";
-  return null; // 両方
+  if(/粟島発|島発|島から|帰り|戻り|帰る/.test(text)) return "粟";
+  if(/岩船発|岩船から|行き|渡る|島へ|粟島へ|村上/.test(text)) return "岩";
+  return null;
 }
 
 /* ---------- その日のダイヤを取得 ---------- */
 function scheduleForDate(d){
-  const ex = DATA.exceptions[iso(d)];
-  if(ex) return {sailings:ex.sailings, label:ex.label};
-  const pat = DATA.patternByDow[d.getDay()];
-  return {sailings:DATA.weekday[pat], label:null};
+  const day=iso(d);
+  const p=PERIODS.find(p=>day>=p.from && day<=p.to);
+  if(!p) return null;
+  const sailings=PAT[p.dow[d.getDay()]] || [];
+  return {sailings, label:p.label||null};
 }
 
-/* ---------- 返答HTMLの組み立て ---------- */
+/* ---------- 返答の組み立て ---------- */
 function answerSchedule(text){
-  const d = parseDate(text);
-  if(!d){
-    return `日付がわかりませんでした🙏\n「今日」「明日」「6月20日」「土曜」などで聞いてください。`;
-  }
-  const dir = parseDir(text);
-  const {sailings, label} = scheduleForDate(d);
-  let list = sailings;
-  if(dir) list = sailings.filter(s=>s.dep===dir);
+  const d=parseDate(text);
+  if(!d) return `日付がわかりませんでした🙏\n「今日」「明日」「6月20日」「土曜」などで聞いてください。`;
+  const dir=parseDir(text);
 
-  let html = `<span class="day">📅 ${fmtDate(d)}${label?` ・${label}`:""}</span>`;
-  if(!inRange(d)){
-    html += `この日付は手元のダイヤ表（〜${DATA.validTo}）の範囲外かもしれません。`+
-            `<a href="${DATA.official}" target="_blank" rel="noopener">公式で確認</a>してください。\n\n`;
+  let html=`<span class="day">📅 ${fmtDate(d)}</span>`;
+  if(day_out_of_range(d)){
+    return html+`この日付は今のダイヤ表（${INFO.source}・3〜9月）の範囲外です。`+
+      `最新は<a href="${INFO.official}" target="_blank" rel="noopener">公式サイト</a>でご確認ください。`;
   }
+  const res=scheduleForDate(d);
+  if(!res){ return html+`ダイヤが見つかりませんでした。<a href="${INFO.official}" target="_blank" rel="noopener">公式で確認</a>してください。`; }
+  if(res.label) html=`<span class="day">📅 ${fmtDate(d)} ・${res.label}</span>`;
+
+  let list=res.sailings.slice().sort((a,b)=>toMin(a.t)-toMin(b.t));
+  if(dir) list=list.filter(s=>s.d===dir);
+
   if(list.length===0){
-    html += dir==="粟島" ? "この日の粟島発の便はありません。" : "この日の岩船発の便はありません。";
-  }else{
-    html += `<table>`;
-    for(const s of list){
-      const arrPort = s.dep==="粟島" ? "岩船" : "粟島";
-      html += `<tr><td class="dir">${s.dep}発</td><td>${s.time} → ${arrPort}着 ${s.arr}</td></tr>`;
-    }
-    html += `</table>`;
-    html += `<span class="note">${DATA.ship}（約${DATA.crossingMin}分）｜出航15分前までに受付`+
-            `<br>※海上状況で変更あり → <a href="${DATA.official}" target="_blank" rel="noopener">当日の運航状況</a> / TEL ${DATA.tel}</span>`;
+    html+= dir==="粟" ? "この日の粟島発の便はありません。" : "この日の岩船発の便はありません。";
+    return html;
   }
+  const anyHs=list.some(s=>s.hs);
+  html+=`<table>`;
+  for(const s of list){
+    const dest=s.d==="粟"?"岩船":"粟島";
+    html+=`<tr><td class="dir">${s.d}島発${s.d==="岩"?"※":""}</td><td>${s.t} → ${dest}着 ${s.a}${s.hs?' <span class="hs">🚤高速船</span>':''}</td></tr>`;
+  }
+  html+=`</table>`;
+  html+=`<span class="note">「粟島発」＝島→岩船 ／ 「岩船発」＝岩船→島`+
+        (anyHs?`<br>この期間は高速船（約60分）`:`<br>フェリー（約95分）`)+`｜出航15分前までに受付`+
+        `<br>※海上状況で変更あり → <a href="${INFO.official}" target="_blank" rel="noopener">当日の運航状況</a> / TEL ${INFO.tel}</span>`;
   return html;
 }
+const toMin=t=>{const[h,m]=t.split(":").map(Number);return h*60+m;};
+const day_out_of_range=d=>{const s=iso(d);return s<INFO.validFrom||s>INFO.validTo;};
 
 function answerFare(){
-  let html = `<span class="day">💰 運賃</span><table>`;
-  for(const [k,v] of DATA.fare.rows) html += `<tr><td class="dir">${k}</td><td>${v}</td></tr>`;
-  html += `</table><span class="note">${DATA.fare.note}<br><a href="${DATA.official}" target="_blank" rel="noopener">公式の料金表</a></span>`;
+  let html=`<span class="day">💰 運賃</span><table>`;
+  for(const[k,v] of FARE.rows) html+=`<tr><td class="dir">${k}</td><td>${v}</td></tr>`;
+  html+=`</table><span class="note">${FARE.note}<br><a href="${INFO.official}" target="_blank" rel="noopener">公式の料金表</a></span>`;
   return html;
 }
 
-/* ---------- ルーティング ---------- */
 function respond(text){
   if(/運賃|料金|いくら|値段|金額/.test(ZEN2HAN(text))) return answerFare();
-  if(/使い方|ヘルプ|help|何ができ/.test(text)){
+  if(/使い方|ヘルプ|help|何ができ/.test(text))
     return `日付を入れて聞いてください😊\n例：\n・「今日の船」\n・「6月20日」\n・「土曜の粟島発」\n・「明日 帰りの船」\n・「運賃」`;
-  }
   return answerSchedule(text);
 }
 
 /* ---------- 画面表示 ---------- */
-const log = document.getElementById("log");
-function addBubble(html, who){
+const log=document.getElementById("log");
+function addBubble(html,who){
   const row=document.createElement("div"); row.className=`row ${who}`;
   const b=document.createElement("div"); b.className="bubble"; b.innerHTML=html;
   row.appendChild(b); log.appendChild(row); log.scrollTop=log.scrollHeight;
 }
-function ask(text){
-  addBubble(text.replace(/</g,"&lt;"), "user");
-  setTimeout(()=>addBubble(respond(text), "bot"), 180);
-}
+function ask(text){ addBubble(text.replace(/</g,"&lt;"),"user"); setTimeout(()=>addBubble(respond(text),"bot"),180); }
 
-document.getElementById("form").addEventListener("submit", e=>{
+document.getElementById("form").addEventListener("submit",e=>{
   e.preventDefault();
   const q=document.getElementById("q"); const v=q.value.trim();
   if(!v) return; q.value=""; ask(v);
 });
-document.getElementById("quick").addEventListener("click", e=>{
-  if(e.target.dataset.q) ask(e.target.dataset.q);
-});
+document.getElementById("quick").addEventListener("click",e=>{ if(e.target.dataset.q) ask(e.target.dataset.q); });
 
-/* 起動メッセージ */
-addBubble(
-  `こんにちは！粟島汽船のダイヤ案内ボットです⛴️\n`+
-  `知りたい日を教えてください。\n下のボタンか、自由入力でどうぞ。`, "bot");
+addBubble(`こんにちは！粟島汽船のダイヤ案内ボットです⛴️\n知りたい日を教えてください。\n下のボタンか、自由入力でどうぞ。`,"bot");
 </script>
 </body>
 </html>
