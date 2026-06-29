@@ -20,17 +20,19 @@ var FORM_URL     = "https://honbo-teruki.github.io/awashima-ferry/yado.html";
 var FERRY_TIMETABLE_URL = "https://awashimakisen.co.jp/schedule.html";
 
 var HEADER = ["受付日時","種別","代表者","電話","メール","連絡方法","行く日","泊数","部屋数","大人","子供",
-              "食事","来る船","送迎","エリア希望","希望の宿","やりたいこと","その他希望","備考","1週間前通知","2日前通知"];
+              "食事","来る船","送迎","エリア希望","希望の宿","やりたいこと","その他希望","備考","同意","1週間前通知","2日前通知"];
 
 function doPost(e){
   try{
     var d = JSON.parse(e.postData.contents);
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sh = ss.getSheetByName(SHEET_NAME) || ss.insertSheet(SHEET_NAME);
-    if(sh.getLastRow() === 0) sh.appendRow(HEADER);
+    // 見出し行を常に最新に保つ（列を追加しても自動で揃う）
+    var head1 = sh.getLastRow()===0 ? [] : sh.getRange(1,1,1,Math.max(sh.getLastColumn(),1)).getValues()[0];
+    if(head1.join("|") !== HEADER.join("|")) sh.getRange(1,1,1,HEADER.length).setValues([HEADER]);
     var kind = d.kind || "新規";
     sh.appendRow([new Date(), kind, d.name, d.tel, d.email, d.contact, d.checkin, d.nights, d.rooms, d.adults, d.kids,
-                  d.meal, d.boat, d.pickup, d.area, d.yado, d.experiences, d.expOther, d.note, "", ""]);
+                  d.meal, d.boat, d.pickup, d.area, d.yado, d.experiences, d.expOther, d.note, (d.agree||""), "", ""]);
 
     var details =
       "代表者　： " + d.name + "\n" +
@@ -53,7 +55,8 @@ function doPost(e){
     // ① 幹事（自分）へ通知
     MailApp.sendEmail(NOTIFY_EMAIL, "【粟島 宿泊相談" + tag + "】" + d.name + "様",
       (kind === "修正版" ? "※修正版（前回の内容を更新したものです）\n\n" : "") +
-      "新しい宿泊相談が届きました。\n\n" + details + "\n\n（フォームから自動送信されています）");
+      "新しい宿泊相談が届きました。\n\n" + details + "\n\n（フォームから自動送信されています）",
+      {name:"粟島 宿泊相談フォーム", replyTo:(d.email || NOTIFY_EMAIL)});
 
     // ② 相手（申込者）へ受付控え（メールが入力されていれば）
     if(d.email){
@@ -63,7 +66,8 @@ function doPost(e){
         "――― ご入力内容 ―――\n" + details + "\n\n" +
         "■ 内容を修正したいとき\n下記フォームからもう一度送信してください（最新版として受け付けます）。\n" + FORM_URL + "\n\n" +
         "※これは予約確定ではありません。確定後の変更・キャンセルは各自でお宿へ直接ご連絡ください。\n" +
-        "※お心当たりがない場合はこのメールを破棄してください。");
+        "※お心当たりがない場合はこのメールを破棄してください。",
+        {name:"粟島 宿泊相談（幹事）", replyTo:NOTIFY_EMAIL});
     }
     return ContentService.createTextOutput(JSON.stringify({ok:true})).setMimeType(ContentService.MimeType.JSON);
   }catch(err){
@@ -125,7 +129,7 @@ function sendReminderMail_(row, col, whenLabel, days, go, tz){
     "送迎　　： " + row[col["送迎"]] + "\n\n" +
     "※予約確定後の変更・キャンセルは各自でお宿へ直接ご連絡ください。\n" +
     "良い粟島旅を！🏝️";
-  MailApp.sendEmail(email, subject, body);
+  MailApp.sendEmail(email, subject, body, {name:"粟島 宿泊リマインド", replyTo:NOTIFY_EMAIL});
 }
 
 // "YYYY-MM-DD" 文字列 または Date を Date に変換

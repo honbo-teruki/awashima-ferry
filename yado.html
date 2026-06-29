@@ -43,6 +43,11 @@
     background:#fff; border:1px solid var(--line); border-radius:14px; padding:11px 14px; margin:0 0 14px; font-size:12.5px; box-shadow:var(--shadow); color:#4a525a;}
   .editbar button{width:auto; background:#fff; color:var(--sea-d); border:1.5px solid var(--sea); border-radius:10px; padding:9px 13px; font-size:12.5px; font-weight:700; cursor:pointer; font-family:inherit;}
   .revnote{background:#fff7e6; border:1px solid #f0cf86; color:#8a5a12; border-radius:12px; padding:10px 13px; font-size:12.5px; margin:0 0 14px; font-weight:500; line-height:1.6;}
+  .consent{display:flex; align-items:flex-start; gap:10px; border:1.5px solid var(--line); border-radius:12px; padding:13px; background:#faf8f3; font-size:13px; line-height:1.65; cursor:pointer; color:#3a444b;}
+  .consent input{appearance:none; -webkit-appearance:none; width:20px; height:20px; border:1.5px solid #c4cdc9; border-radius:6px; flex:0 0 auto; position:relative; background:#fff; cursor:pointer; margin-top:1px;}
+  .consent input:checked{background:var(--sea); border-color:var(--sea);}
+  .consent input:checked::after{content:"✓"; color:#fff; font-size:13px; line-height:1; position:absolute; top:2px; left:3px;}
+  .consent:has(input:checked){border-color:var(--sea); background:var(--sea-l);}
 
   .card{background:var(--card); border-radius:18px; padding:18px 16px; margin-bottom:14px; box-shadow:var(--shadow);}
   .card h2{font-size:14px; margin:0 0 13px; color:var(--sea-d); display:flex; align-items:center; gap:9px; font-weight:700;}
@@ -234,6 +239,15 @@
       <textarea id="note" placeholder="例：アレルギー、子供の年齢、和室希望、到着が遅れるかも 等"></textarea>
     </div>
 
+    <!-- 個人情報の同意 -->
+    <div class="card">
+      <h2>📜 個人情報の取扱い</h2>
+      <div class="hint" style="margin-bottom:11px; line-height:1.7">
+        ご入力いただいた情報（お名前・電話番号・メール等）は、<b>粟島での宿泊・体験の相談と調整の目的のみ</b>に使用し、必要な範囲でお宿・関係者に共有します。それ以外の目的には使用しません。
+      </div>
+      <label class="consent"><input type="checkbox" id="agree"><span>上記に同意して送信します <span class="req">必須</span></span></label>
+    </div>
+
     <button type="button" class="submit" id="go">この内容で相談する →</button>
     <div class="err" id="err"></div>
     <div class="foot">
@@ -391,6 +405,7 @@ function buildSummary(){
     "希望の宿： "+$("yado").value,
     "やりたいこと： "+expText(),
     "備考　　： "+($("note").value||"なし"),
+    "個人情報の取扱い： "+($("agree").checked?"同意":"未同意"),
   ];
   return lines.join("\n");
 }
@@ -402,6 +417,7 @@ function validate(){
   const email=$("email").value.trim();
   if(pick("contact")==="メール" && !email) return "メール連絡をご希望の場合は、メールアドレスを入力してください。";
   if(email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "メールアドレスの形式をご確認ください。";
+  if(!$("agree").checked) return "個人情報の取扱いに同意のうえ送信してください。";
   return "";
 }
 $("go").addEventListener("click",()=>{
@@ -430,7 +446,7 @@ function collectData(){
     boat:$("boat").value, pickup:pick("pickup"), area:pick("area"),
     yado:$("yado").value, experiences:exps().join("、"), expOther:$("expOther").value,
     email:$("email").value, contact:pick("contact"), kind:revision?"修正版":"新規",
-    note:$("note").value, ts:new Date().toString()
+    agree:$("agree").checked?"同意":"", note:$("note").value, ts:new Date().toString()
   };
 }
 $("copy").addEventListener("click",async()=>{
