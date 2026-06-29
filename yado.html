@@ -32,6 +32,10 @@
   .seg input{display:none;}
   .seg input:checked + span{font-weight:700; color:var(--grn-d);}
   .seg label:has(input:checked){border-color:var(--grn); background:#e9f5f0;}
+  .chips{display:flex; flex-wrap:wrap; gap:8px;}
+  .chips label{flex:1 1 46%; border:1px solid var(--line); border-radius:9px; padding:10px 11px; font-size:13px; cursor:pointer; background:#fff; display:flex; align-items:center; gap:7px;}
+  .chips input{accent-color:var(--grn); width:auto; flex:0 0 auto;}
+  .chips label:has(input:checked){border-color:var(--grn); background:#e9f5f0; font-weight:700; color:var(--grn-d);}
   .hint{font-size:11px; color:var(--muted); margin-top:4px; line-height:1.5;}
   .boat-note{font-size:12px; background:#eef4fb; border:1px solid #cfe0ef; border-radius:8px; padding:8px 10px; margin-top:6px; color:#2a5f86;}
   .price{background:#f3faf6; border:1px dashed var(--grn); border-radius:10px; padding:11px 13px; font-size:13px; line-height:1.7;}
@@ -118,6 +122,25 @@
       <select id="boat"></select>
       <div id="boat-note" class="boat-note" style="display:none"></div>
       <div class="hint" style="margin-top:6px">船の全時刻は <a id="ferrylink" href="index.html" target="_blank" rel="noopener">⛴️ 粟島汽船ダイヤ案内ボット</a> でも確認できます。</div>
+    </div>
+
+    <!-- やってみたいこと -->
+    <div class="card">
+      <h2>🎒 島でやってみたいこと <span style="font-weight:400;color:var(--muted);font-size:11px">任意・複数OK</span></h2>
+      <div class="hint" style="margin-bottom:9px">気になるものにチェック！事前に分かると、体験や観光協会での予約準備がスムーズです（確約ではなく希望の把握用です）。</div>
+      <div class="chips" id="exp">
+        <label><input type="checkbox" name="exp" value="わっぱ煮を食べる"> 🍲 わっぱ煮を食べる</label>
+        <label><input type="checkbox" name="exp" value="レンタサイクル"> 🚲 レンタサイクルで島めぐり</label>
+        <label><input type="checkbox" name="exp" value="穴釣り"> 🎣 穴釣り</label>
+        <label><input type="checkbox" name="exp" value="海釣り（船釣り）"> 🚤 海釣り（船釣り）</label>
+        <label><input type="checkbox" name="exp" value="乗馬・あわしま牧場見学"> 🐴 乗馬・あわしま牧場見学</label>
+        <label><input type="checkbox" name="exp" value="星空観察"> 🌌 星空観察</label>
+        <label><input type="checkbox" name="exp" value="海で泳ぐ"> 🏊 海で泳ぐ</label>
+        <label><input type="checkbox" name="exp" value="レジャー（海・自然遊び）"> 🏝️ レジャー（海・自然遊び）</label>
+        <label><input type="checkbox" name="exp" value="キャンプ"> ⛺ キャンプ</label>
+      </div>
+      <label class="f" style="margin-top:11px">その他・やってみたいこと <span class="opt">自由記入</span></label>
+      <input id="expOther" placeholder="例：島を一周したい、夕日スポットに行きたい 等">
     </div>
 
     <!-- 送迎・宿・備考 -->
@@ -259,6 +282,13 @@ $("nights").addEventListener("change",updateCheckout);
 updatePrice(); updateBoats();
 
 /* ---- 送信 ---- */
+function exps(){ return [...document.querySelectorAll('input[name=exp]:checked')].map(c=>c.value); }
+function expText(){
+  const list=exps(); const other=$("expOther").value.trim();
+  let t=list.join("、");
+  if(other) t+=(t?"、":"")+"その他:"+other;
+  return t||"特になし";
+}
 function buildSummary(){
   const meal=curMeal();
   const ci=$("checkin").value;
@@ -275,6 +305,7 @@ function buildSummary(){
     "来る船　： "+$("boat").value,
     "送迎　　： "+document.querySelector('input[name=pickup]:checked').value,
     "希望の宿： "+$("yado").value,
+    "やりたいこと： "+expText(),
     "備考　　： "+($("note").value||"なし"),
   ];
   return lines.join("\n");
@@ -306,7 +337,8 @@ function collectData(){
     name:$("name").value, tel:$("tel").value, checkin:$("checkin").value, nights:$("nights").value,
     rooms:$("rooms").value, adults:$("adults").value, kids:$("kids").value, meal:curMeal(),
     boat:$("boat").value, pickup:document.querySelector('input[name=pickup]:checked').value,
-    yado:$("yado").value, note:$("note").value, ts:new Date().toString()
+    yado:$("yado").value, experiences:exps().join("、"), expOther:$("expOther").value,
+    note:$("note").value, ts:new Date().toString()
   };
 }
 $("copy").addEventListener("click",async()=>{
